@@ -1,0 +1,774 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "VigíaSLP · API central",
+        "description": "API REST del módulo E01. Coordenadas WGS 84 (EPSG:4326). Los reportes ciudadanos no son cifras oficiales.",
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/health": {
+            "get": {
+                "tags": [
+                    "Operación"
+                ],
+                "summary": "Salud",
+                "operationId": "salud_health_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/version": {
+            "get": {
+                "tags": [
+                    "Operación"
+                ],
+                "summary": "Version",
+                "operationId": "version_version_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tipos-delito": {
+            "get": {
+                "tags": [
+                    "Catálogo"
+                ],
+                "summary": "Listar Tipos",
+                "operationId": "listar_tipos_api_v1_tipos_delito_get",
+                "parameters": [
+                    {
+                        "name": "categoria",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Categoria"
+                        }
+                    },
+                    {
+                        "name": "incluir_inactivos",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false,
+                            "title": "Incluir Inactivos"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Catálogo"
+                ],
+                "summary": "Crear Tipo",
+                "operationId": "crear_tipo_api_v1_tipos_delito_post",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TipoDelitoIn"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tipos-delito/{tipo_id}": {
+            "delete": {
+                "tags": [
+                    "Catálogo"
+                ],
+                "summary": "Baja Tipo",
+                "operationId": "baja_tipo_api_v1_tipos_delito__tipo_id__delete",
+                "parameters": [
+                    {
+                        "name": "tipo_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "title": "Tipo Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reportes": {
+            "post": {
+                "tags": [
+                    "Reportes"
+                ],
+                "summary": "Crear Reporte",
+                "operationId": "crear_reporte_api_v1_reportes_post",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReporteIn"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "tags": [
+                    "Reportes"
+                ],
+                "summary": "Buscar Reportes",
+                "operationId": "buscar_reportes_api_v1_reportes_get",
+                "parameters": [
+                    {
+                        "name": "latitud",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "number",
+                                    "maximum": 90,
+                                    "minimum": -90
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Latitud"
+                        }
+                    },
+                    {
+                        "name": "longitud",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "number",
+                                    "maximum": 180,
+                                    "minimum": -180
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Longitud"
+                        }
+                    },
+                    {
+                        "name": "radio_m",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer",
+                                    "maximum": 5000,
+                                    "minimum": 1
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "Radio en metros (máx. 5000)",
+                            "title": "Radio M"
+                        },
+                        "description": "Radio en metros (máx. 5000)"
+                    },
+                    {
+                        "name": "colonia_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Colonia Id"
+                        }
+                    },
+                    {
+                        "name": "bbox",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "description": "min_lon,min_lat,max_lon,max_lat",
+                            "title": "Bbox"
+                        },
+                        "description": "min_lon,min_lat,max_lon,max_lat"
+                    },
+                    {
+                        "name": "tipo_delito_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Tipo Delito Id"
+                        }
+                    },
+                    {
+                        "name": "desde",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Desde"
+                        }
+                    },
+                    {
+                        "name": "hasta",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Hasta"
+                        }
+                    },
+                    {
+                        "name": "estado",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "enum": [
+                                "PENDIENTE",
+                                "PUBLICADO",
+                                "RECHAZADO",
+                                "DUPLICADO"
+                            ],
+                            "type": "string",
+                            "default": "PUBLICADO",
+                            "title": "Estado"
+                        }
+                    },
+                    {
+                        "name": "pagina",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1,
+                            "title": "Pagina"
+                        }
+                    },
+                    {
+                        "name": "tamano",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 200,
+                            "minimum": 1,
+                            "default": 50,
+                            "title": "Tamano"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reportes/{folio}": {
+            "get": {
+                "tags": [
+                    "Reportes"
+                ],
+                "summary": "Obtener Reporte",
+                "operationId": "obtener_reporte_api_v1_reportes__folio__get",
+                "parameters": [
+                    {
+                        "name": "folio",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Folio"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reportes/buscar": {
+            "post": {
+                "tags": [
+                    "Reportes"
+                ],
+                "summary": "Buscar Por Poligono",
+                "operationId": "buscar_por_poligono_api_v1_reportes_buscar_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BusquedaIn"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/geo/colonia": {
+            "get": {
+                "tags": [
+                    "Geografía"
+                ],
+                "summary": "Colonia De Coordenada",
+                "operationId": "colonia_de_coordenada_api_v1_geo_colonia_get",
+                "parameters": [
+                    {
+                        "name": "latitud",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 90,
+                            "minimum": -90,
+                            "title": "Latitud"
+                        }
+                    },
+                    {
+                        "name": "longitud",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number",
+                            "maximum": 180,
+                            "minimum": -180,
+                            "title": "Longitud"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "BusquedaIn": {
+                "properties": {
+                    "poligono": {
+                        "additionalProperties": true,
+                        "type": "object",
+                        "title": "Poligono",
+                        "description": "GeoJSON de tipo Polygon (longitud, latitud)"
+                    },
+                    "tipo_delito_id": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Tipo Delito Id"
+                    },
+                    "desde": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Desde"
+                    },
+                    "hasta": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Hasta"
+                    },
+                    "estado": {
+                        "type": "string",
+                        "enum": [
+                            "PENDIENTE",
+                            "PUBLICADO",
+                            "RECHAZADO",
+                            "DUPLICADO"
+                        ],
+                        "title": "Estado",
+                        "default": "PUBLICADO"
+                    },
+                    "pagina": {
+                        "type": "integer",
+                        "minimum": 1.0,
+                        "title": "Pagina",
+                        "default": 1
+                    },
+                    "tamano": {
+                        "type": "integer",
+                        "maximum": 200.0,
+                        "minimum": 1.0,
+                        "title": "Tamano",
+                        "default": 50
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "poligono"
+                ],
+                "title": "BusquedaIn"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "ReporteIn": {
+                "properties": {
+                    "tipo_delito_id": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0.0,
+                        "title": "Tipo Delito Id"
+                    },
+                    "descripcion": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "maxLength": 500
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Descripcion"
+                    },
+                    "fecha_hecho": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Fecha Hecho"
+                    },
+                    "latitud": {
+                        "type": "number",
+                        "maximum": 90.0,
+                        "minimum": -90.0,
+                        "title": "Latitud"
+                    },
+                    "longitud": {
+                        "type": "number",
+                        "maximum": 180.0,
+                        "minimum": -180.0,
+                        "title": "Longitud"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "tipo_delito_id",
+                    "fecha_hecho",
+                    "latitud",
+                    "longitud"
+                ],
+                "title": "ReporteIn"
+            },
+            "TipoDelitoIn": {
+                "properties": {
+                    "codigo": {
+                        "type": "string",
+                        "maxLength": 20,
+                        "minLength": 3,
+                        "title": "Codigo"
+                    },
+                    "categoria": {
+                        "type": "string",
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "title": "Categoria"
+                    },
+                    "tipo": {
+                        "type": "string",
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "title": "Tipo"
+                    },
+                    "subtipo": {
+                        "type": "string",
+                        "maxLength": 120,
+                        "minLength": 1,
+                        "title": "Subtipo"
+                    },
+                    "es_vfs": {
+                        "type": "boolean",
+                        "title": "Es Vfs",
+                        "default": false
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "codigo",
+                    "categoria",
+                    "tipo",
+                    "subtipo"
+                ],
+                "title": "TipoDelitoIn"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    },
+                    "input": {
+                        "title": "Input"
+                    },
+                    "ctx": {
+                        "type": "object",
+                        "title": "Context"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        }
+    }
+}
