@@ -69,3 +69,15 @@ CREATE TABLE historial_estado_reporte (
     cambiado_en      timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_historial_reporte ON historial_estado_reporte (reporte_id);
+
+-- Suscripciones a zonas (interfaz con E7). El identificador es opaco: no se guardan datos personales.
+CREATE TABLE suscripciones (
+    id                   bigserial PRIMARY KEY,
+    canal                text NOT NULL DEFAULT 'telegram' CHECK (canal IN ('telegram','web')),
+    identificador_externo text NOT NULL,
+    centro               geometry(Point, 4326) NOT NULL,
+    radio_m              integer NOT NULL CHECK (radio_m BETWEEN 100 AND 5000),
+    activa               boolean NOT NULL DEFAULT true,
+    creada_en            timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_suscripciones_identificador ON suscripciones (identificador_externo) WHERE activa;

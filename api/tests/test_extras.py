@@ -87,3 +87,19 @@ def test_roles_e9(cliente, tipo, monkeypatch):
     assert cliente.patch(ruta, json=cuerpo, headers={"x-rol": "moderador"}).status_code == 200
     assert cliente.delete("/api/v1/tipos-delito/1", headers={"x-rol": "moderador"}).status_code == 403
     assert cliente.post("/api/v1/ingesta/reportes", json={"fuente": "x", "registros": []}, headers={"x-rol": "ingesta"}).status_code == 422
+
+
+def test_suscripciones(cliente, tipo):
+    antes = hace(0.001)
+    s = cliente.post("/api/v1/suscripciones", json={"identificador_externo": "chat-" + uuid.uuid4().hex[:6], "latitud": LAT, "longitud": LON, "radio_m": 1000})
+    assert s.status_code == 201
+    sid = s.json()["id"]
+    f = nuevo_reporte(cliente, tipo)
+    cliente.patch(f"/api/v1/reportes/{f}/estado", json={"estado_nuevo": "PUBLICADO"})
+    nov = cliente.get(f"/api/v1/suscripciones/{sid}/novedades", params={"desde": antes}).json()["datos"]
+    assert any(n["folio"] == f for n in nov)
+    assert cliente.post("/api/v1/suscripciones", json={"identificador_externo": "abc", "latitud": 10, "longitud": -80, "radio_m": 500}).status_code == 422
+    assert cliente.post("/api/v1/suscripciones", json={"identificador_externo": "abc", "latitud": LAT, "longitud": LON, "radio_m": 5}).json()["code"] == "VALIDACION_FALLIDA"
+    assert cliente.delete(f"/api/v1/suscripciones/{sid}").status_code == 204
+    assert cliente.delete(f"/api/v1/suscripciones/{sid}").status_code == 404
+    assert cliente.get(f"/api/v1/suscripciones/{sid}/novedades", params={"desde": antes}).status_code == 404

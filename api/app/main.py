@@ -417,3 +417,53 @@ def ingestar(i: IngestaIn, _rol=Depends(requiere("ingesta"))):
             con.execute("INSERT INTO historial_estado_reporte (reporte_id, estado_anterior, estado_nuevo, motivo) VALUES (%s, NULL, 'PUBLICADO', %s)", (fila["id"], f"Ingesta externa: {i.fuente}"))
             insertados += 1
     return {"fuente": i.fuente, "insertados": insertados, "duplicados": duplicados, "rechazados": rechazados}
+
+
+# ---------- Interfaz con E7: suscripciones a zonas ----------
+class SuscripcionIn(BaseModel):
+    canal: Literal["telegram", "web"] = "telegram"
+    identificador_externo: str = Field(min_length=3, max_length=120)
+    latitud: float = Field(ge=-90, le=90)
+    longitud: float = Field(ge=-180, le=180)
+    radio_m: int = Field(ge=100, le=5000)
+
+
+@app.post("/api/v1/suscripciones", status_code=201, tags=["Suscripciones (E7)"])
+def crear_suscripcion(s: SuscripcionIn, _rol=Depends(requiere("bot", "ciudadano"))):
+    if not dentro_cobertura(s.latitud, s.longitud):
+        raise ErrorApi(422, "UBICACION_FUERA_DE_COBERTURA", "La ubicación está fuera de San Luis Potosí")
+    with conexion() as con:
+        fila = con.execute(
+            """INSERT INTO suscripciones (canal, identificador_externo, centro, radio_m)
+               VALUES (%s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s) RETURNING id""",
+            (s.canal, s.identificador_externo, s.longitud, s.latitud, s.radio_m)).fetchone()
+    return {"id": fila["id"], "radio_m": s.radio_m, "activa": True}
+
+
+@app.get("/api/v1/suscripciones", tags=["Suscripciones (E7)"])
+def listar_suscripciones(identificador_externo: str = Query(min_length=3), _rol=Depends(requiere("bot", "ciudadano"))):
+    with conexion() as con:
+        filas = con.execute(
+            "SELECT id, canal, ST_Y(centro) AS latitud, ST_X(centro) AS longitud, radio_m, creada_en FROM suscripciones WHERE identificador_externo = %s AND activa ORDER BY id",
+            (identificador_externo,)).fetchall()
+    return {"datos": filas}
+
+
+@app.delete("/api/v1/suscripciones/{suscripcion_id}", status_code=204, tags=["Suscripciones (E7)"])
+def baja_suscripcion(suscripcion_id: int, _rol=Depends(requiere("bot", "ciudadano"))):
+    with conexion() as con:
+        fila = con.execute("UPDATE suscripciones SET activa = false WHERE id = %s AND activa RETURNING id", (suscripcion_id,)).fetchone()
+    if not fila:
+        raise ErrorApi(404, "SUSCRIPCION_NO_ENCONTRADA", "La suscripción no existe o ya fue cancelada")
+
+
+@app.get("/api/v1/suscripciones/{suscripcion_id}/novedades", tags=["Suscripciones (E7)"])
+def novedades_suscripcion(suscripcion_id: int, desde: datetime, _rol=Depends(requiere("bot"))):
+    sql = (SELECT_REPORTE + FROM_REPORTE + " JOIN suscripciones s ON s.id = %(id)s AND s.activa"
+           " WHERE r.estado = 'PUBLICADO' AND r.actualizado_en > %(desde)s"
+           " AND ST_DWithin(r.ubicacion::geography, s.centro::geography, s.radio_m) ORDER BY r.actualizado_en DESC LIMIT 200")
+    with conexion() as con:
+        if not con.execute("SELECT 1 FROM suscripciones WHERE id = %s AND activa", (suscripcion_id,)).fetchone():
+            raise ErrorApi(404, "SUSCRIPCION_NO_ENCONTRADA", "La suscripción no existe o ya fue cancelada")
+        filas = con.execute(sql, {"id": suscripcion_id, "desde": desde}).fetchall()
+    return {"datos": [_publico(f) for f in filas]}
