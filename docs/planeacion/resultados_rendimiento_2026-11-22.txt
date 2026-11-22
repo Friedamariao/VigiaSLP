@@ -1,0 +1,3 @@
+{"peticiones":300,"radio_m":500,"media_ms":4.6,"p50_ms":4.2,"p95_ms":6.9,"p99_ms":10.7,"max_ms":35.4,"cumple_500ms_p95":true}
+{"peticiones":300,"radio_m":1000,"media_ms":6.0,"p50_ms":5.2,"p95_ms":9.2,"p99_ms":15.9,"max_ms":53.5,"cumple_500ms_p95":true}
+{"peticiones":300,"radio_m":5000,"media_ms":18.2,"p50_ms":17.2,"p95_ms":29.1,"p99_ms":44.4,"max_ms":50.8,"cumple_500ms_p95":true}
