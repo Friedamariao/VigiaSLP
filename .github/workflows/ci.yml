@@ -1,0 +1,15 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+jobs:
+  base:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar que no haya archivos .env versionados
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then echo "Hay un .env versionado"; exit 1; fi
+      - name: Pipeline base
+        run: echo "Pipeline base en verde; las pruebas y el escaneo de secretos se agregan en el Avance 3."

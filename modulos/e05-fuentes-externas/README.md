@@ -1,0 +1,3 @@
+# e05-fuentes-externas
+
+Carpeta del módulo. Ver CONTRIBUTING.md para las reglas de trabajo.
