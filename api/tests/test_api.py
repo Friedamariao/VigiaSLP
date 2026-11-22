@@ -119,3 +119,12 @@ def test_geocodificacion_inversa(cliente):
     ok = cliente.get("/api/v1/geo/colonia", params={"latitud": LAT, "longitud": LON})
     assert ok.status_code == 200 and ok.json()["fuente"] == "provisional"
     assert cliente.get("/api/v1/geo/colonia", params={"latitud": 19.43, "longitud": -99.13}).status_code == 404
+
+
+def test_canal_de_origen(cliente, tipos):
+    r = cliente.post("/api/v1/reportes", json=reporte(tipos[0], canal_origen="telegram"))
+    assert r.status_code == 201
+    assert cliente.get(f"/api/v1/reportes/{r.json()['folio']}").json()["canal_origen"] == "telegram"
+    por_defecto = cliente.post("/api/v1/reportes", json=reporte(tipos[0]))
+    assert cliente.get(f"/api/v1/reportes/{por_defecto.json()['folio']}").json()["canal_origen"] == "web"
+    assert cliente.post("/api/v1/reportes", json=reporte(tipos[0], canal_origen="fax")).json()["code"] == "VALIDACION_FALLIDA"

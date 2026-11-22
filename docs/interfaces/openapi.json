@@ -1,15 +1,15 @@
 {
     "openapi": "3.1.0",
     "info": {
-        "title": "VigíaSLP · API central",
-        "description": "API REST del módulo E01. Coordenadas WGS 84 (EPSG:4326). Los reportes ciudadanos no son cifras oficiales.",
+        "title": "Vig\u00edaSLP \u00b7 API central",
+        "description": "API REST del m\u00f3dulo E01. Coordenadas WGS 84 (EPSG:4326). Los reportes ciudadanos no son cifras oficiales.",
         "version": "0.1.0"
     },
     "paths": {
         "/health": {
             "get": {
                 "tags": [
-                    "Operación"
+                    "Operaci\u00f3n"
                 ],
                 "summary": "Salud",
                 "operationId": "salud_health_get",
@@ -28,7 +28,7 @@
         "/version": {
             "get": {
                 "tags": [
-                    "Operación"
+                    "Operaci\u00f3n"
                 ],
                 "summary": "Version",
                 "operationId": "version_version_get",
@@ -47,7 +47,7 @@
         "/api/v1/tipos-delito": {
             "get": {
                 "tags": [
-                    "Catálogo"
+                    "Cat\u00e1logo"
                 ],
                 "summary": "Listar Tipos",
                 "operationId": "listar_tipos_api_v1_tipos_delito_get",
@@ -102,7 +102,7 @@
             },
             "post": {
                 "tags": [
-                    "Catálogo"
+                    "Cat\u00e1logo"
                 ],
                 "summary": "Crear Tipo",
                 "operationId": "crear_tipo_api_v1_tipos_delito_post",
@@ -141,7 +141,7 @@
         "/api/v1/tipos-delito/{tipo_id}": {
             "delete": {
                 "tags": [
-                    "Catálogo"
+                    "Cat\u00e1logo"
                 ],
                 "summary": "Baja Tipo",
                 "operationId": "baja_tipo_api_v1_tipos_delito__tipo_id__delete",
@@ -269,10 +269,10 @@
                                     "type": "null"
                                 }
                             ],
-                            "description": "Radio en metros (máx. 5000)",
+                            "description": "Radio en metros (m\u00e1x. 5000)",
                             "title": "Radio M"
                         },
-                        "description": "Radio en metros (máx. 5000)"
+                        "description": "Radio en metros (m\u00e1x. 5000)"
                     },
                     {
                         "name": "colonia_id",
@@ -502,7 +502,7 @@
         "/api/v1/geo/colonia": {
             "get": {
                 "tags": [
-                    "Geografía"
+                    "Geograf\u00eda"
                 ],
                 "summary": "Colonia De Coordenada",
                 "operationId": "colonia_de_coordenada_api_v1_geo_colonia_get",
@@ -660,6 +660,15 @@
                             }
                         ],
                         "title": "Descripcion"
+                    },
+                    "canal_origen": {
+                        "type": "string",
+                        "enum": [
+                            "web",
+                            "telegram"
+                        ],
+                        "title": "Canal Origen",
+                        "default": "web"
                     },
                     "fecha_hecho": {
                         "type": "string",

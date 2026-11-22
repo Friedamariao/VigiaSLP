@@ -39,6 +39,7 @@ CREATE TABLE reportes (
     folio            text NOT NULL UNIQUE,
     tipo_delito_id   integer NOT NULL REFERENCES tipos_delito(id),
     descripcion      text,
+    canal_origen     text NOT NULL DEFAULT 'web' CHECK (canal_origen IN ('web','telegram')),
     fecha_hecho      timestamptz NOT NULL,
     ubicacion        geometry(Point, 4326) NOT NULL,
     colonia_id       integer REFERENCES colonias(id),

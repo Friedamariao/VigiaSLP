@@ -85,6 +85,7 @@ class TipoDelitoIn(BaseModel):
 class ReporteIn(BaseModel):
     tipo_delito_id: int = Field(gt=0)
     descripcion: Optional[str] = Field(default=None, max_length=500)
+    canal_origen: Literal["web", "telegram"] = "web"
     fecha_hecho: datetime
     latitud: float = Field(ge=-90, le=90)
     longitud: float = Field(ge=-180, le=180)
@@ -161,7 +162,7 @@ def _publico(fila):
     return fila
 
 
-SELECT_REPORTE = """SELECT r.folio, r.estado, r.descripcion, r.fecha_hecho, r.creado_en,
+SELECT_REPORTE = """SELECT r.folio, r.estado, r.descripcion, r.canal_origen, r.fecha_hecho, r.creado_en,
        t.id AS tipo_delito_id, t.codigo AS tipo_codigo, t.subtipo AS tipo_nombre,
        c.id AS colonia_id, c.nombre AS colonia, c.ageb,
        ST_Y(r.ubicacion) AS latitud, ST_X(r.ubicacion) AS longitud"""
@@ -186,11 +187,11 @@ def crear_reporte(r: ReporteIn):
             try:
                 with con.transaction():
                     fila = con.execute(
-                        """INSERT INTO reportes (folio, tipo_delito_id, descripcion, fecha_hecho, ubicacion, colonia_id)
-                           VALUES (%(f)s, %(t)s, %(d)s, %(fh)s, ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326),
+                        """INSERT INTO reportes (folio, tipo_delito_id, descripcion, canal_origen, fecha_hecho, ubicacion, colonia_id)
+                           VALUES (%(f)s, %(t)s, %(d)s, %(canal)s, %(fh)s, ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326),
                                    (SELECT id FROM colonias WHERE ST_Covers(geom, ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326)) LIMIT 1))
                            RETURNING id, folio""",
-                        {"f": folio, "t": r.tipo_delito_id, "d": r.descripcion, "fh": fecha, "lon": r.longitud, "lat": r.latitud},
+                        {"f": folio, "t": r.tipo_delito_id, "d": r.descripcion, "canal": r.canal_origen, "fh": fecha, "lon": r.longitud, "lat": r.latitud},
                     ).fetchone()
                     con.execute("INSERT INTO historial_estado_reporte (reporte_id, estado_anterior, estado_nuevo, motivo) VALUES (%s, NULL, 'PENDIENTE', 'Alta del reporte')", (fila["id"],))
                 break
