@@ -1,0 +1,36 @@
+-- Catálogo preliminar de tipos de delito v0.1 (codigo_sesnsp por homologar con E5).
+INSERT INTO catalogo_version (version, descripcion, vigente)
+VALUES ('v0.1-preliminar', 'Catálogo ciudadano preliminar del Avance 1', true);
+
+INSERT INTO tipos_delito (codigo, categoria, tipo, subtipo, version_catalogo, es_vfs, publicable_mapa) VALUES
+('PAT-001','Patrimonio','Robo','Robo a transeúnte con violencia','v0.1-preliminar',false,true),
+('PAT-002','Patrimonio','Robo','Robo a transeúnte sin violencia','v0.1-preliminar',false,true),
+('PAT-003','Patrimonio','Robo','Robo a casa habitación','v0.1-preliminar',false,true),
+('PAT-004','Patrimonio','Robo','Robo a negocio','v0.1-preliminar',false,true),
+('PAT-005','Patrimonio','Robo','Robo de vehículo','v0.1-preliminar',false,true),
+('PAT-006','Patrimonio','Robo','Robo de autopartes','v0.1-preliminar',false,true),
+('PAT-007','Patrimonio','Robo','Robo de motocicleta o bicicleta','v0.1-preliminar',false,true),
+('PAT-008','Patrimonio','Robo','Robo a transporte público','v0.1-preliminar',false,true),
+('PAT-009','Patrimonio','Fraude','Fraude presencial','v0.1-preliminar',false,true),
+('PAT-010','Patrimonio','Extorsión','Extorsión','v0.1-preliminar',false,true),
+('PAT-011','Patrimonio','Daño a la propiedad','Daño a la propiedad','v0.1-preliminar',false,true),
+('PAT-012','Patrimonio','Despojo','Despojo','v0.1-preliminar',false,true),
+('VID-001','Vida e integridad corporal','Lesiones','Lesiones por riña','v0.1-preliminar',false,true),
+('VID-002','Vida e integridad corporal','Lesiones','Lesiones por agresión','v0.1-preliminar',false,true),
+('VID-003','Vida e integridad corporal','Homicidio','Homicidio','v0.1-preliminar',false,true),
+('VID-004','Vida e integridad corporal','Disparo de arma de fuego','Disparos o balacera','v0.1-preliminar',false,true),
+('LIB-001','Libertad personal','Secuestro','Secuestro','v0.1-preliminar',false,true),
+('LIB-002','Libertad personal','Privación de la libertad','Privación de la libertad','v0.1-preliminar',false,true),
+('LIB-003','Libertad personal','Amenazas','Amenazas','v0.1-preliminar',false,true),
+('SEG-001','Seguridad y convivencia','Narcomenudeo','Venta de droga','v0.1-preliminar',false,true),
+('SEG-002','Seguridad y convivencia','Alteración del orden','Riña o disturbio','v0.1-preliminar',false,true),
+('SEG-003','Seguridad y convivencia','Vandalismo','Grafiti o vandalismo','v0.1-preliminar',false,true),
+('SEG-004','Seguridad y convivencia','Acoso en espacio público','Acoso callejero','v0.1-preliminar',false,true),
+('SEG-005','Seguridad y convivencia','Portación de armas','Persona armada','v0.1-preliminar',false,true),
+('SEG-006','Seguridad y convivencia','Condiciones de riesgo','Alumbrado deficiente o zona peligrosa','v0.1-preliminar',false,true),
+('SEG-007','Seguridad y convivencia','Conducción peligrosa','Conducción en estado de ebriedad','v0.1-preliminar',false,true),
+('VFS-001','Familia','Violencia familiar','Violencia familiar','v0.1-preliminar',true,false),
+('VFS-002','Libertad y seguridad sexual','Delitos sexuales','Abuso o acoso sexual','v0.1-preliminar',true,false),
+('VFS-003','Libertad y seguridad sexual','Delitos sexuales','Violación','v0.1-preliminar',true,false),
+('VFS-004','Vida e integridad','Violencia de género','Violencia de género o feminicidio','v0.1-preliminar',true,false),
+('OTR-001','Otros','Otro incidente','Otro incidente no clasificado','v0.1-preliminar',false,true);
