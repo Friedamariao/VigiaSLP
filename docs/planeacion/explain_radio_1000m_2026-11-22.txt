@@ -1,0 +1,22 @@
+                                                                                          QUERY PLAN                                                                                          
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=3170.29..3170.30 rows=1 width=16) (actual time=14.996..15.006 rows=50 loops=1)
+   Buffers: shared hit=221
+   ->  Sort  (cost=3170.29..3170.30 rows=1 width=16) (actual time=14.994..14.999 rows=50 loops=1)
+         Sort Key: fecha_hecho DESC
+         Sort Method: top-N heapsort  Memory: 28kB
+         Buffers: shared hit=221
+         ->  Bitmap Heap Scan on reportes r  (cost=18.07..3170.28 rows=1 width=16) (actual time=13.891..14.887 rows=147 loops=1)
+               Filter: ((estado = 'PUBLICADO'::text) AND st_dwithin((ubicacion)::geography, '0101000020E610000066666666663E59C06666666666263640'::geography, '1000'::double precision, true))
+               Rows Removed by Filter: 72
+               Heap Blocks: exact=136
+               Buffers: shared hit=218
+               ->  Bitmap Index Scan on idx_reportes_ubicacion_geog  (cost=0.00..18.06 rows=222 width=0) (actual time=0.166..0.167 rows=219 loops=1)
+                     Index Cond: ((ubicacion)::geography && _st_expand('0101000020E610000066666666663E59C06666666666263640'::geography, '1000'::double precision))
+                     Buffers: shared hit=10
+ Planning:
+   Buffers: shared hit=337
+ Planning Time: 16.202 ms
+ Execution Time: 15.294 ms
+(18 rows)
+
