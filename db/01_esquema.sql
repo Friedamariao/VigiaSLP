@@ -39,7 +39,9 @@ CREATE TABLE reportes (
     folio            text NOT NULL UNIQUE,
     tipo_delito_id   integer NOT NULL REFERENCES tipos_delito(id),
     descripcion      text,
-    canal_origen     text NOT NULL DEFAULT 'web' CHECK (canal_origen IN ('web','telegram')),
+    canal_origen     text NOT NULL DEFAULT 'web' CHECK (canal_origen IN ('web','telegram','ingesta')),
+    fuente           text NOT NULL DEFAULT 'ciudadano',
+    referencia_externa text,
     fecha_hecho      timestamptz NOT NULL,
     ubicacion        geometry(Point, 4326) NOT NULL,
     colonia_id       integer REFERENCES colonias(id),
@@ -52,6 +54,7 @@ CREATE TABLE reportes (
 -- Índices espaciales: geometría (bbox, polígono) y geografía (radio en metros).
 CREATE INDEX idx_reportes_ubicacion      ON reportes USING gist (ubicacion);
 CREATE INDEX idx_reportes_ubicacion_geog ON reportes USING gist ((ubicacion::geography));
+CREATE UNIQUE INDEX uq_reportes_fuente_ref ON reportes (fuente, referencia_externa) WHERE referencia_externa IS NOT NULL;
 CREATE INDEX idx_reportes_fecha          ON reportes (fecha_hecho);
 CREATE INDEX idx_reportes_tipo           ON reportes (tipo_delito_id);
 CREATE INDEX idx_reportes_colonia        ON reportes (colonia_id);

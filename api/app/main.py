@@ -1,4 +1,4 @@
-"""API central de VigíaSLP (E01) · RF-01.1 a RF-01.8 (versión de construcción, Avance 3)."""
+"""API central de VigíaSLP (E01) · RF-01.1 a RF-01.8 e interfaces con E5 (ingesta), E8 (estados) y E9 (roles)."""
 import json
 import logging
 import os
@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import FastAPI, Query, Request
+from fastapi import Depends, FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -17,7 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .db import conexion
 from .util import dentro_cobertura, generar_folio, ofuscar, parsear_bbox
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 logger = logging.getLogger("vigiaslp.api")
 logging.basicConfig(level=os.environ.get("API_LOG_LEVEL", "INFO").upper(), format="%(message)s")
 
@@ -28,6 +28,21 @@ app = FastAPI(
 )
 ESTADOS = ("PENDIENTE", "PUBLICADO", "RECHAZADO", "DUPLICADO")
 ORIENTACION_VFS = "Este tipo de caso no se publica en el mapa. Si estás en peligro llama al 911; para orientación y denuncia anónima, al 089."
+
+
+# ---------- Roles (interfaz con E9) ----------
+# AUTH_MODO=off (por defecto, desarrollo) | cabecera: el middleware de E9 valida el token y envía X-Rol.
+def requiere(*roles):
+    def verificar(request: Request):
+        if os.environ.get("AUTH_MODO", "off") != "cabecera":
+            return None
+        rol = request.headers.get("x-rol")
+        if not rol:
+            raise ErrorApi(401, "NO_AUTENTICADO", "Se requiere autenticación")
+        if rol not in roles and rol != "administrador":
+            raise ErrorApi(403, "ROL_INSUFICIENTE", "El rol no tiene permiso para esta operación", f"rol={rol}")
+        return rol
+    return verificar
 
 
 # ---------- Errores (RFC 9457, application/problem+json) ----------
@@ -91,12 +106,37 @@ class ReporteIn(BaseModel):
     longitud: float = Field(ge=-180, le=180)
 
 
+ORDENES = {"fecha_desc": "r.fecha_hecho DESC, r.id DESC", "fecha_asc": "r.fecha_hecho ASC, r.id ASC"}
+Orden = Literal["fecha_desc", "fecha_asc", "distancia"]
+TRANSICIONES = {"PENDIENTE": ("PUBLICADO", "RECHAZADO", "DUPLICADO"), "PUBLICADO": ("RECHAZADO",), "RECHAZADO": ("PENDIENTE",), "DUPLICADO": ()}
+
+
+class CambioEstadoIn(BaseModel):
+    estado_nuevo: Literal["PENDIENTE", "PUBLICADO", "RECHAZADO", "DUPLICADO"]
+    motivo: Optional[str] = Field(default=None, max_length=300)
+
+
+class RegistroIngesta(BaseModel):
+    tipo_delito_id: int = Field(gt=0)
+    fecha_hecho: datetime
+    latitud: float = Field(ge=-90, le=90)
+    longitud: float = Field(ge=-180, le=180)
+    descripcion: Optional[str] = Field(default=None, max_length=500)
+    referencia_externa: Optional[str] = Field(default=None, max_length=120)
+
+
+class IngestaIn(BaseModel):
+    fuente: str = Field(min_length=2, max_length=60)
+    registros: list[RegistroIngesta] = Field(min_length=1, max_length=1000)
+
+
 class BusquedaIn(BaseModel):
     poligono: dict = Field(description="GeoJSON de tipo Polygon (longitud, latitud)")
     tipo_delito_id: Optional[int] = None
     desde: Optional[datetime] = None
     hasta: Optional[datetime] = None
     estado: Literal["PENDIENTE", "PUBLICADO", "RECHAZADO", "DUPLICADO"] = "PUBLICADO"
+    orden: Literal["fecha_desc", "fecha_asc"] = "fecha_desc"
     pagina: int = Field(default=1, ge=1)
     tamano: int = Field(default=50, ge=1, le=200)
 
@@ -133,7 +173,7 @@ def listar_tipos(categoria: Optional[str] = None, incluir_inactivos: bool = Fals
 
 
 @app.post("/api/v1/tipos-delito", status_code=201, tags=["Catálogo"])
-def crear_tipo(t: TipoDelitoIn):
+def crear_tipo(t: TipoDelitoIn, _rol=Depends(requiere("administrador"))):
     try:
         with conexion() as con:
             fila = con.execute(
@@ -148,7 +188,7 @@ def crear_tipo(t: TipoDelitoIn):
 
 
 @app.delete("/api/v1/tipos-delito/{tipo_id}", status_code=204, tags=["Catálogo"])
-def baja_tipo(tipo_id: int):
+def baja_tipo(tipo_id: int, _rol=Depends(requiere("administrador"))):
     with conexion() as con:
         fila = con.execute("UPDATE tipos_delito SET activo = false WHERE id = %s RETURNING id", (tipo_id,)).fetchone()
     if not fila:
@@ -212,10 +252,16 @@ def obtener_reporte(folio: str):
 
 
 # ---------- Consultas geoespaciales (RF-01.3 y RF-01.4) ----------
-def _consultar(extra_sql, params, pagina, tamano):
+def _consultar(extra_sql, params, pagina, tamano, orden="fecha_desc"):
     cond = ["r.estado = %(estado)s"] + extra_sql
+    if orden == "distancia":
+        if "lon" not in params:
+            raise ErrorApi(422, "ORDEN_INVALIDO", "El orden por distancia requiere consulta por radio")
+        orden_sql = "ST_Distance(r.ubicacion::geography, ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326)::geography), r.id"
+    else:
+        orden_sql = ORDENES[orden]
     sql = (SELECT_REPORTE + ", COUNT(*) OVER() AS total" + FROM_REPORTE + " WHERE " + " AND ".join(cond)
-           + " ORDER BY r.fecha_hecho DESC, r.id DESC LIMIT %(limite)s OFFSET %(desplazamiento)s")
+           + " ORDER BY " + orden_sql + " LIMIT %(limite)s OFFSET %(desplazamiento)s")
     params = {**params, "limite": tamano, "desplazamiento": (pagina - 1) * tamano}
     with conexion() as con:
         filas = con.execute(sql, params).fetchall()
@@ -249,6 +295,7 @@ def buscar_reportes(
     desde: Optional[datetime] = None,
     hasta: Optional[datetime] = None,
     estado: Literal["PENDIENTE", "PUBLICADO", "RECHAZADO", "DUPLICADO"] = "PUBLICADO",
+    orden: Orden = "fecha_desc",
     pagina: int = Query(1, ge=1),
     tamano: int = Query(50, ge=1, le=200),
 ):
@@ -270,7 +317,7 @@ def buscar_reportes(
         extra_sql.append("r.ubicacion && ST_MakeEnvelope(%(x1)s, %(y1)s, %(x2)s, %(y2)s, 4326)")
         params.update({"x1": x1, "y1": y1, "x2": x2, "y2": y2})
     _comunes(tipo_delito_id, desde, hasta, extra_sql, params)
-    return _consultar(extra_sql, params, pagina, tamano)
+    return _consultar(extra_sql, params, pagina, tamano, orden)
 
 
 @app.post("/api/v1/reportes/buscar", tags=["Reportes"])
@@ -282,7 +329,7 @@ def buscar_por_poligono(b: BusquedaIn):
     params["geojson"] = json.dumps(b.poligono)
     _comunes(b.tipo_delito_id, b.desde, b.hasta, extra_sql, params)
     try:
-        return _consultar(extra_sql, params, b.pagina, b.tamano)
+        return _consultar(extra_sql, params, b.pagina, b.tamano, b.orden)
     except Exception as e:
         if "geometry" in str(e).lower() or "geojson" in str(e).lower():
             raise ErrorApi(422, "POLIGONO_INVALIDO", "El polígono no es una geometría válida")
@@ -300,3 +347,73 @@ def colonia_de_coordenada(latitud: float = Query(ge=-90, le=90), longitud: float
     if not fila:
         raise ErrorApi(404, "COLONIA_NO_ENCONTRADA", "No hay colonia registrada para esa coordenada")
     return fila
+
+
+# ---------- Interfaz con E8: estados del reporte ----------
+@app.patch("/api/v1/reportes/{folio}/estado", tags=["Moderación (E8)"])
+def cambiar_estado(folio: str, c: CambioEstadoIn, _rol=Depends(requiere("moderador"))):
+    with conexion() as con:
+        fila = con.execute("SELECT id, estado FROM reportes WHERE folio = %s FOR UPDATE", (folio,)).fetchone()
+        if not fila:
+            raise ErrorApi(404, "REPORTE_NO_ENCONTRADO", "No existe un reporte con ese folio")
+        if c.estado_nuevo not in TRANSICIONES[fila["estado"]]:
+            raise ErrorApi(409, "TRANSICION_INVALIDA", "La transición de estado no está permitida", f"{fila['estado']} -> {c.estado_nuevo}")
+        con.execute("UPDATE reportes SET estado = %s, actualizado_en = now() WHERE id = %s", (c.estado_nuevo, fila["id"]))
+        con.execute("INSERT INTO historial_estado_reporte (reporte_id, estado_anterior, estado_nuevo, motivo) VALUES (%s,%s,%s,%s)",
+                    (fila["id"], fila["estado"], c.estado_nuevo, c.motivo))
+    return {"folio": folio, "estado_anterior": fila["estado"], "estado": c.estado_nuevo}
+
+
+@app.get("/api/v1/reportes/{folio}/historial", tags=["Moderación (E8)"])
+def historial_estado(folio: str, _rol=Depends(requiere("moderador"))):
+    with conexion() as con:
+        r = con.execute("SELECT id FROM reportes WHERE folio = %s", (folio,)).fetchone()
+        if not r:
+            raise ErrorApi(404, "REPORTE_NO_ENCONTRADO", "No existe un reporte con ese folio")
+        filas = con.execute("SELECT estado_anterior, estado_nuevo, motivo, cambiado_en FROM historial_estado_reporte WHERE reporte_id = %s ORDER BY id", (r["id"],)).fetchall()
+    return {"folio": folio, "datos": filas}
+
+
+# ---------- Estadísticas agregadas (para E4) ----------
+@app.get("/api/v1/estadisticas", tags=["Estadísticas"])
+def estadisticas(agrupar_por: Literal["tipo", "colonia", "mes"] = "tipo", desde: Optional[datetime] = None, hasta: Optional[datetime] = None,
+                 estado: Literal["PENDIENTE", "PUBLICADO", "RECHAZADO", "DUPLICADO"] = "PUBLICADO"):
+    extra, params = [], {"estado": estado}
+    _comunes(None, desde, hasta, extra, params)
+    grupos = {"tipo": ("t.codigo", "t.subtipo"), "colonia": ("COALESCE(c.clave,'SIN_COLONIA')", "COALESCE(c.nombre,'Sin colonia')"),
+              "mes": ("to_char(r.fecha_hecho,'YYYY-MM')", "to_char(r.fecha_hecho,'YYYY-MM')")}
+    clave, etiqueta = grupos[agrupar_por]
+    sql = (f"SELECT {clave} AS clave, {etiqueta} AS etiqueta, COUNT(*) AS total" + FROM_REPORTE
+           + " WHERE r.estado = %(estado)s" + "".join(" AND " + e for e in extra) + " GROUP BY 1, 2 ORDER BY total DESC, 1")
+    with conexion() as con:
+        filas = con.execute(sql, params).fetchall()
+    return {"agrupar_por": agrupar_por, "datos": filas, "aviso": "Cifras de reportes ciudadanos; no constituyen estadística oficial."}
+
+
+# ---------- Interfaz con E5: ingesta de datos externos ----------
+@app.post("/api/v1/ingesta/reportes", tags=["Ingesta (E5)"])
+def ingestar(i: IngestaIn, _rol=Depends(requiere("ingesta"))):
+    insertados, duplicados, rechazados = 0, 0, []
+    with conexion() as con:
+        tipos = {t["id"]: t for t in con.execute("SELECT id, activo FROM tipos_delito").fetchall()}
+        for n, r in enumerate(i.registros):
+            if not dentro_cobertura(r.latitud, r.longitud):
+                rechazados.append({"indice": n, "code": "UBICACION_FUERA_DE_COBERTURA"})
+                continue
+            if r.tipo_delito_id not in tipos or not tipos[r.tipo_delito_id]["activo"]:
+                rechazados.append({"indice": n, "code": "TIPO_INVALIDO"})
+                continue
+            fecha = r.fecha_hecho if r.fecha_hecho.tzinfo else r.fecha_hecho.replace(tzinfo=timezone.utc)
+            fila = con.execute(
+                """INSERT INTO reportes (folio, tipo_delito_id, descripcion, canal_origen, fuente, referencia_externa, fecha_hecho, ubicacion, estado, colonia_id)
+                   VALUES (%(f)s, %(t)s, %(d)s, 'ingesta', %(fu)s, %(ref)s, %(fh)s, ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326), 'PUBLICADO',
+                           (SELECT id FROM colonias WHERE ST_Covers(geom, ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326)) LIMIT 1))
+                   ON CONFLICT (fuente, referencia_externa) WHERE referencia_externa IS NOT NULL DO NOTHING RETURNING id""",
+                {"f": generar_folio(), "t": r.tipo_delito_id, "d": r.descripcion, "fu": i.fuente, "ref": r.referencia_externa, "fh": fecha, "lon": r.longitud, "lat": r.latitud},
+            ).fetchone()
+            if not fila:
+                duplicados += 1
+                continue
+            con.execute("INSERT INTO historial_estado_reporte (reporte_id, estado_anterior, estado_nuevo, motivo) VALUES (%s, NULL, 'PUBLICADO', %s)", (fila["id"], f"Ingesta externa: {i.fuente}"))
+            insertados += 1
+    return {"fuente": i.fuente, "insertados": insertados, "duplicados": duplicados, "rechazados": rechazados}
