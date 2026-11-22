@@ -29,6 +29,8 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"
       OFUSCACION_DECIMALES: ${OFUSCACION_DECIMALES:-3}
+      CORS_ORIGENES: ${CORS_ORIGENES:-*}
+      AUTH_MODO: ${AUTH_MODO:-off}
     ports:
       - "${API_PORT:-8000}:8000"
 volumes:

@@ -103,3 +103,8 @@ def test_suscripciones(cliente, tipo):
     assert cliente.delete(f"/api/v1/suscripciones/{sid}").status_code == 204
     assert cliente.delete(f"/api/v1/suscripciones/{sid}").status_code == 404
     assert cliente.get(f"/api/v1/suscripciones/{sid}/novedades", params={"desde": antes}).status_code == 404
+
+
+def test_cors(cliente):
+    r = cliente.options("/api/v1/reportes", headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "POST"})
+    assert r.status_code == 200 and r.headers["access-control-allow-origin"] in ("*", "http://localhost:5173")

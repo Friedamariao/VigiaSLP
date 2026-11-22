@@ -9,6 +9,7 @@ from typing import Literal, Optional
 
 from fastapi import Depends, FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from psycopg.errors import UniqueViolation
@@ -26,6 +27,9 @@ app = FastAPI(
     version=VERSION,
     description="API REST del módulo E01. Coordenadas WGS 84 (EPSG:4326). Los reportes ciudadanos no son cifras oficiales.",
 )
+# CORS para clientes web (E2, E3, E4, E8). CORS_ORIGENES: lista separada por comas; por defecto "*" (solo datos sintéticos en pruebas).
+app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGENES", "*").split(",")],
+                   allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"], allow_headers=["*"], expose_headers=["x-request-id"])
 ESTADOS = ("PENDIENTE", "PUBLICADO", "RECHAZADO", "DUPLICADO")
 ORIENTACION_VFS = "Este tipo de caso no se publica en el mapa. Si estás en peligro llama al 911; para orientación y denuncia anónima, al 089."
 
