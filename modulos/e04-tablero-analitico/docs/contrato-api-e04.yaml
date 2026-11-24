@@ -1,0 +1,263 @@
+openapi: 3.0.3
+info:
+  title: VigíaSLP - E04 Analítica
+  description: >
+    Endpoints del módulo de analítica de incidencia y tablero de zonas recurrentes.
+    Todos los datos provienen de reportes ciudadanos validados por E08.
+    El tipo VFS (violencia familiar o sexual) queda excluido de toda respuesta.
+  version: 0.1.0
+
+servers:
+  - url: /api/v1
+    description: API central (E01)
+
+paths:
+  /analitica/tendencias:
+    get:
+      summary: Tendencias de reportes en el tiempo
+      operationId: obtenerTendencias
+      parameters:
+        - name: periodo
+          in: query
+          schema:
+            type: string
+            enum: [dia, semana, mes]
+            default: semana
+        - $ref: '#/components/parameters/tipo_delito'
+        - $ref: '#/components/parameters/fecha_inicio'
+        - $ref: '#/components/parameters/fecha_fin'
+        - $ref: '#/components/parameters/colonia'
+        - $ref: '#/components/parameters/ageb'
+      responses:
+        '200':
+          description: Serie temporal de reportes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TendenciasResponse'
+
+  /analitica/hotspots:
+    get:
+      summary: Zonas con mayor recurrencia de reportes
+      operationId: obtenerHotspots
+      description: >
+        Devuelve las colonias con mayor concentración de reportes validados.
+        Solo se incluyen colonias con al menos 3 reportes.
+        Las coordenadas son aproximadas (centroide de colonia).
+      parameters:
+        - $ref: '#/components/parameters/tipo_delito'
+        - $ref: '#/components/parameters/fecha_inicio'
+        - $ref: '#/components/parameters/fecha_fin'
+        - name: limite
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Lista de hotspots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HotspotsResponse'
+
+  /analitica/comparativo:
+    get:
+      summary: Comparativo reportes ciudadanos vs cifra oficial SESNSP
+      operationId: obtenerComparativo
+      description: >
+        La cifra oficial del SESNSP es municipal y mensual;
+        el comparativo solo existe a ese nivel de agregación.
+      parameters:
+        - $ref: '#/components/parameters/tipo_delito'
+        - $ref: '#/components/parameters/fecha_inicio'
+        - $ref: '#/components/parameters/fecha_fin'
+      responses:
+        '200':
+          description: Datos comparativos por mes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComparativoResponse'
+
+  /analitica/resumen:
+    get:
+      summary: Resumen general para tarjetas del tablero
+      operationId: obtenerResumen
+      parameters:
+        - $ref: '#/components/parameters/fecha_inicio'
+        - $ref: '#/components/parameters/fecha_fin'
+        - $ref: '#/components/parameters/colonia'
+      responses:
+        '200':
+          description: Métricas resumidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumenResponse'
+
+  /analitica/tipos-delito:
+    get:
+      summary: Desglose de reportes por tipo de delito
+      operationId: obtenerTiposDelito
+      parameters:
+        - $ref: '#/components/parameters/fecha_inicio'
+        - $ref: '#/components/parameters/fecha_fin'
+        - $ref: '#/components/parameters/colonia'
+        - $ref: '#/components/parameters/ageb'
+      responses:
+        '200':
+          description: Conteo por tipo de delito
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TiposDelitoResponse'
+
+components:
+  parameters:
+    tipo_delito:
+      name: tipo_delito
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [RTR, RCH, RVE, RAP, RNE, RTP, LES, DAN, FRA, ACO, SOS]
+    fecha_inicio:
+      name: fecha_inicio
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+    fecha_fin:
+      name: fecha_fin
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+    colonia:
+      name: colonia
+      in: query
+      required: false
+      schema:
+        type: string
+    ageb:
+      name: ageb
+      in: query
+      required: false
+      schema:
+        type: string
+
+  schemas:
+    TendenciasResponse:
+      type: object
+      properties:
+        periodo:
+          type: string
+        datos:
+          type: array
+          items:
+            type: object
+            properties:
+              fecha:
+                type: string
+              total:
+                type: integer
+              por_tipo:
+                type: object
+                additionalProperties:
+                  type: integer
+        disclaimer:
+          type: string
+
+    HotspotsResponse:
+      type: object
+      properties:
+        hotspots:
+          type: array
+          items:
+            type: object
+            properties:
+              colonia:
+                type: string
+              ageb:
+                type: string
+                nullable: true
+              total_reportes:
+                type: integer
+              tipos_frecuentes:
+                type: array
+                items:
+                  type: string
+              lat:
+                type: number
+              lng:
+                type: number
+        disclaimer:
+          type: string
+
+    ComparativoResponse:
+      type: object
+      properties:
+        datos:
+          type: array
+          items:
+            type: object
+            properties:
+              mes:
+                type: string
+              ciudadano:
+                type: integer
+              oficial:
+                type: integer
+              tipo_delito:
+                type: string
+                nullable: true
+        nota:
+          type: string
+        disclaimer:
+          type: string
+
+    ResumenResponse:
+      type: object
+      properties:
+        total_reportes:
+          type: integer
+        reportes_semana:
+          type: integer
+        tipo_mas_frecuente:
+          $ref: '#/components/schemas/TipoDelitoConteo'
+        colonia_mas_reportes:
+          type: object
+          properties:
+            nombre:
+              type: string
+            total:
+              type: integer
+        tendencia:
+          type: string
+        disclaimer:
+          type: string
+
+    TiposDelitoResponse:
+      type: object
+      properties:
+        tipos:
+          type: array
+          items:
+            $ref: '#/components/schemas/TipoDelitoConteo'
+        disclaimer:
+          type: string
+
+    TipoDelitoConteo:
+      type: object
+      properties:
+        clave:
+          type: string
+        nombre:
+          type: string
+        total:
+          type: integer

@@ -1,0 +1,49 @@
+.filtros-panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.filtros-titulo {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #1a1a2e;
+}
+
+.filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.filtro-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.filtro-grupo span {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #555;
+}
+
+.filtro-grupo select,
+.filtro-grupo input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: #fff;
+  color: #1a1a2e;
+}
+
+.filtro-grupo select:focus,
+.filtro-grupo input:focus {
+  outline: 2px solid #457b9d;
+  outline-offset: -1px;
+  border-color: transparent;
+}
