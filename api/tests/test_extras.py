@@ -1,4 +1,5 @@
-"""Pruebas de orden (RF-01.6) y de las interfaces con E8 (estados), E5 (ingesta), E9 (roles) y estadísticas."""
+"""Pruebas de orden (RF-01.6), de la interfaz con E8 (estados), de E5 (ingesta) y de estadísticas."""
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -6,6 +7,20 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+
+
+@pytest.fixture(scope="module", autouse=True)
+def autenticacion_desactivada_en_pruebas_base():
+    """Las pruebas de E1/E5/E7 corren sin JWT; E09 se prueba en test_auth.py."""
+    anterior = os.environ.get("AUTH_MODO")
+    os.environ["AUTH_MODO"] = "off"
+    try:
+        yield
+    finally:
+        if anterior is None:
+            os.environ.pop("AUTH_MODO", None)
+        else:
+            os.environ["AUTH_MODO"] = anterior
 
 LAT, LON = 22.15, -100.975
 
@@ -76,17 +91,6 @@ def test_ingesta_idempotente(cliente, tipo):
     assert cliente.post("/api/v1/ingesta/reportes", json=cuerpo).json()["duplicados"] == 1
     assert cliente.post("/api/v1/ingesta/reportes", json={"fuente": "x", "registros": []}).status_code == 422
 
-
-def test_roles_e9(cliente, tipo, monkeypatch):
-    monkeypatch.setenv("AUTH_MODO", "cabecera")
-    f = nuevo_reporte(cliente, tipo)
-    ruta = f"/api/v1/reportes/{f}/estado"
-    cuerpo = {"estado_nuevo": "RECHAZADO"}
-    assert cliente.patch(ruta, json=cuerpo).json()["code"] == "NO_AUTENTICADO"
-    assert cliente.patch(ruta, json=cuerpo, headers={"x-rol": "ciudadano"}).json()["code"] == "ROL_INSUFICIENTE"
-    assert cliente.patch(ruta, json=cuerpo, headers={"x-rol": "moderador"}).status_code == 200
-    assert cliente.delete("/api/v1/tipos-delito/1", headers={"x-rol": "moderador"}).status_code == 403
-    assert cliente.post("/api/v1/ingesta/reportes", json={"fuente": "x", "registros": []}, headers={"x-rol": "ingesta"}).status_code == 422
 
 
 def test_suscripciones(cliente, tipo):

@@ -36,7 +36,7 @@ jobs:
         run: pip install -r api/requirements-dev.txt
       - name: Crear esquema y datos semilla
         run: |
-          for f in db/01_esquema.sql db/02_catalogo.sql db/03_semilla.sql; do
+          for f in db/01_esquema.sql db/02_catalogo.sql db/03_semilla.sql db/04_auth.sql; do
             psql -h localhost -U vigia -d vigiaslp -v ON_ERROR_STOP=1 -f "$f"
           done
       - name: Pruebas con cobertura mínima de 60 %
