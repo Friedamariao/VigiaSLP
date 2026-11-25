@@ -2,14 +2,43 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [develop, main]
+    branches: [develop, main, 'feature/**']
 jobs:
-  base:
+  api:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:15-3.4
+        env:
+          POSTGRES_DB: vigiaslp
+          POSTGRES_USER: vigia
+          POSTGRES_PASSWORD: ci_password_temporal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vigia -d vigiaslp"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_USER: vigia
+      POSTGRES_PASSWORD: ci_password_temporal
+      POSTGRES_DB: vigiaslp
+      PGPASSWORD: ci_password_temporal
     steps:
       - uses: actions/checkout@v4
       - name: Verificar que no haya archivos .env versionados
         run: |
           if git ls-files | grep -E '(^|/)\.env$'; then echo "Hay un .env versionado"; exit 1; fi
-      - name: Pipeline base
-        run: echo "Pipeline base en verde; las pruebas y el escaneo de secretos se agregan en el Avance 3."
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar dependencias
+        run: pip install -r api/requirements-dev.txt
+      - name: Crear esquema y datos semilla
+        run: |
+          for f in db/01_esquema.sql db/02_catalogo.sql db/03_semilla.sql db/04_auth.sql; do
+            psql -h localhost -U vigia -d vigiaslp -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - name: Pruebas con cobertura mínima de 60 %
+        working-directory: api
+        run: python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=60
