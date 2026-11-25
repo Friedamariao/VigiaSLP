@@ -1,4 +1,5 @@
 """Pruebas de la API contra una base PostGIS real (se omiten si no hay conexión)."""
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -6,6 +7,20 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+
+
+@pytest.fixture(scope="module", autouse=True)
+def autenticacion_desactivada_en_pruebas_base():
+    """Las pruebas de E1/E5/E7 corren sin JWT; E09 se prueba en test_auth.py."""
+    anterior = os.environ.get("AUTH_MODO")
+    os.environ["AUTH_MODO"] = "off"
+    try:
+        yield
+    finally:
+        if anterior is None:
+            os.environ.pop("AUTH_MODO", None)
+        else:
+            os.environ["AUTH_MODO"] = anterior
 
 LAT, LON = 22.15, -100.975  # dentro de la cuadrícula provisional
 

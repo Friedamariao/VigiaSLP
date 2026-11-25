@@ -4,14 +4,17 @@ import logging
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
-from fastapi import Depends, FastAPI, Query, Request
+import jwt
+from fastapi import Depends, FastAPI, Query, Request, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from pwdlib import PasswordHash
 from psycopg.errors import UniqueViolation
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -34,17 +37,87 @@ ESTADOS = ("PENDIENTE", "PUBLICADO", "RECHAZADO", "DUPLICADO")
 ORIENTACION_VFS = "Este tipo de caso no se publica en el mapa. Si estás en peligro llama al 911; para orientación y denuncia anónima, al 089."
 
 
-# ---------- Roles (interfaz con E9) ----------
-# AUTH_MODO=off (por defecto, desarrollo) | cabecera: el middleware de E9 valida el token y envía X-Rol.
+# ---------- Autenticacion y RBAC (E09) ----------
+# AUTH_MODO=off desactiva controles solo para desarrollo local.
+# AUTH_MODO=jwt exige Authorization: Bearer <token> y consulta el rol vigente en BD.
+JWT_ALGORITHM = "HS256"
+JWT_ISSUER = "vigiaslp-api"
+ROLES_VALIDOS = ("ciudadano", "bot", "moderador", "ingesta", "administrador")
+password_hasher = PasswordHash.recommended()
+bearer_scheme = HTTPBearer(auto_error=False, scheme_name="JWTBearer")
+
+
+def modo_auth():
+    return os.environ.get("AUTH_MODO", "off").strip().lower()
+
+
+def obtener_secreto_jwt():
+    secreto = os.environ.get("JWT_SECRET_KEY", "")
+    if len(secreto.encode("utf-8")) < 32:
+        raise RuntimeError("JWT_SECRET_KEY debe contener al menos 32 bytes")
+    return secreto
+
+
+def crear_token(usuario: str, rol: str):
+    minutos = int(os.environ.get("JWT_ACCESS_TOKEN_MINUTES", "30"))
+    if minutos < 1 or minutos > 1440:
+        raise RuntimeError("JWT_ACCESS_TOKEN_MINUTES debe estar entre 1 y 1440")
+    ahora = datetime.now(timezone.utc)
+    expira = ahora + timedelta(minutes=minutos)
+    datos = {
+        "sub": usuario,
+        "rol": rol,
+        "iat": ahora,
+        "exp": expira,
+        "iss": JWT_ISSUER,
+    }
+    token = jwt.encode(datos, obtener_secreto_jwt(), algorithm=JWT_ALGORITHM)
+    return token, minutos * 60
+
+
 def requiere(*roles):
-    def verificar(request: Request):
-        if os.environ.get("AUTH_MODO", "off") != "cabecera":
+    def verificar(
+        request: Request,
+        credenciales: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
+    ):
+        modo = modo_auth()
+        if modo == "off":
             return None
-        rol = request.headers.get("x-rol")
-        if not rol:
-            raise ErrorApi(401, "NO_AUTENTICADO", "Se requiere autenticación")
+        if modo != "jwt":
+            raise ErrorApi(503, "AUTH_MODO_INVALIDO", "El modo de autenticación no está soportado")
+        if not credenciales or credenciales.scheme.lower() != "bearer":
+            raise ErrorApi(401, "NO_AUTENTICADO", "Se requiere un token Bearer")
+        try:
+            datos = jwt.decode(
+                credenciales.credentials,
+                obtener_secreto_jwt(),
+                algorithms=[JWT_ALGORITHM],
+                issuer=JWT_ISSUER,
+                options={"require": ["exp", "iat", "sub", "rol", "iss"]},
+            )
+        except jwt.InvalidTokenError:
+            raise ErrorApi(401, "TOKEN_INVALIDO", "El token es inválido o expiró")
+        except RuntimeError:
+            raise ErrorApi(503, "JWT_NO_CONFIGURADO", "La configuración JWT no es válida")
+
+        usuario = datos.get("sub")
+        if not isinstance(usuario, str) or not usuario:
+            raise ErrorApi(401, "TOKEN_INVALIDO", "El token no contiene un usuario válido")
+        with conexion() as con:
+            cuenta = con.execute(
+                "SELECT usuario, rol, activo FROM usuarios WHERE usuario = %s",
+                (usuario,),
+            ).fetchone()
+        if not cuenta or not cuenta["activo"] or datos.get("rol") != cuenta["rol"]:
+            raise ErrorApi(401, "CUENTA_NO_VALIDA", "La cuenta no existe, está inactiva o cambió de rol")
+
+        rol = cuenta["rol"]
+        if rol not in ROLES_VALIDOS:
+            raise ErrorApi(403, "ROL_INVALIDO", "La cuenta no tiene un rol reconocido")
         if rol not in roles and rol != "administrador":
             raise ErrorApi(403, "ROL_INSUFICIENTE", "El rol no tiene permiso para esta operación", f"rol={rol}")
+        request.state.usuario = usuario
+        request.state.rol = rol
         return rol
     return verificar
 
@@ -99,6 +172,17 @@ class TipoDelitoIn(BaseModel):
     tipo: str = Field(min_length=1, max_length=80)
     subtipo: str = Field(min_length=1, max_length=120)
     es_vfs: bool = False
+
+
+class LoginIn(BaseModel):
+    usuario: str = Field(min_length=3, max_length=50, pattern=r"^[A-Za-z0-9_.-]{3,50}$")
+    contrasena: str = Field(min_length=12, max_length=128)
+
+
+class UsuarioCrearIn(BaseModel):
+    usuario: str = Field(min_length=3, max_length=50, pattern=r"^[A-Za-z0-9_.-]{3,50}$")
+    contrasena: str = Field(min_length=12, max_length=128)
+    rol: Literal["ciudadano", "bot", "moderador", "ingesta", "administrador"]
 
 
 class ReporteIn(BaseModel):
@@ -159,6 +243,72 @@ def salud():
 @app.get("/version", tags=["Operación"])
 def version():
     return {"nombre": "vigiaslp-api", "version": VERSION, "api": "v1"}
+
+
+@app.on_event("startup")
+def preparar_autenticacion():
+    """Valida la configuracion JWT y crea el primer administrador solo si la tabla esta vacia."""
+    modo = modo_auth()
+    if modo == "off":
+        return
+    if modo != "jwt":
+        raise RuntimeError("AUTH_MODO debe ser 'off' o 'jwt'")
+    obtener_secreto_jwt()
+    with conexion() as con:
+        total = con.execute("SELECT COUNT(*) AS total FROM usuarios").fetchone()["total"]
+        if total == 0:
+            usuario = os.environ.get("E09_BOOTSTRAP_ADMIN_USERNAME", "").strip().lower()
+            contrasena = os.environ.get("E09_BOOTSTRAP_ADMIN_PASSWORD", "")
+            if not usuario or len(usuario) < 3 or not contrasena or len(contrasena) < 12:
+                raise RuntimeError(
+                    "La tabla usuarios esta vacia. Define E09_BOOTSTRAP_ADMIN_USERNAME y "
+                    "E09_BOOTSTRAP_ADMIN_PASSWORD (minimo 12 caracteres) en .env"
+                )
+            con.execute(
+                "INSERT INTO usuarios (usuario, password_hash, rol) VALUES (%s, %s, 'administrador')",
+                (usuario, password_hasher.hash(contrasena)),
+            )
+            logger.info("Se creo la cuenta inicial de administrador para E09")
+
+
+def exigir_jwt_activo():
+    if modo_auth() != "jwt":
+        raise ErrorApi(503, "AUTH_NO_ACTIVA", "Activa AUTH_MODO=jwt para utilizar esta operación")
+
+
+@app.post("/api/v1/auth/login", tags=["Autenticación"])
+def iniciar_sesion(datos: LoginIn):
+    exigir_jwt_activo()
+    usuario = datos.usuario.strip().lower()
+    with conexion() as con:
+        cuenta = con.execute(
+            "SELECT usuario, password_hash, rol, activo FROM usuarios WHERE usuario = %s",
+            (usuario,),
+        ).fetchone()
+    try:
+        valido = bool(cuenta and cuenta["activo"] and password_hasher.verify(datos.contrasena, cuenta["password_hash"]))
+    except Exception:
+        valido = False
+    if not valido:
+        raise ErrorApi(401, "CREDENCIALES_INVALIDAS", "Usuario o contraseña incorrectos")
+    token, expira_en = crear_token(cuenta["usuario"], cuenta["rol"])
+    return {"access_token": token, "token_type": "bearer", "expires_in": expira_en, "rol": cuenta["rol"]}
+
+
+@app.post("/api/v1/auth/usuarios", status_code=201, tags=["Autenticación"])
+def crear_usuario(datos: UsuarioCrearIn, _rol=Depends(requiere("administrador"))):
+    exigir_jwt_activo()
+    usuario = datos.usuario.strip().lower()
+    try:
+        with conexion() as con:
+            fila = con.execute(
+                "INSERT INTO usuarios (usuario, password_hash, rol) VALUES (%s, %s, %s) "
+                "RETURNING id, usuario, rol, activo, creado_en",
+                (usuario, password_hasher.hash(datos.contrasena), datos.rol),
+            ).fetchone()
+    except UniqueViolation:
+        raise ErrorApi(409, "USUARIO_DUPLICADO", "Ya existe una cuenta con ese usuario")
+    return fila
 
 
 # ---------- Catálogo de tipos de delito (RF-01.1) ----------
